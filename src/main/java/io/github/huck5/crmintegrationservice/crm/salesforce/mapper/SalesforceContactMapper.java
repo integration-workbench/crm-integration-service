@@ -3,6 +3,7 @@ package io.github.huck5.crmintegrationservice.crm.salesforce.mapper;
 import io.github.huck5.crmintegrationservice.crm.ContactDto;
 import io.github.huck5.crmintegrationservice.crm.CrmSource;
 import io.github.huck5.crmintegrationservice.crm.salesforce.model.SalesforceContact;
+import io.github.huck5.crmintegrationservice.crm.response.ContactRetrievalResponse;
 import io.github.huck5.crmintegrationservice.crm.salesforce.response.SalesforceQueryResponse;
 
 import java.util.ArrayList;
@@ -12,7 +13,7 @@ public class SalesforceContactMapper {
   private SalesforceContactMapper() {
   }
 
-  public static List<ContactDto> map(SalesforceQueryResponse<SalesforceContact> response) {
+  public static ContactRetrievalResponse map(SalesforceQueryResponse<SalesforceContact> response) {
     List<ContactDto> contacts = new ArrayList<>();
 
     response.getRecords().forEach(contact -> {
@@ -26,6 +27,6 @@ public class SalesforceContactMapper {
       contacts.add(contactDTO);
     });
 
-    return contacts;
+    return new ContactRetrievalResponse(contacts, response.getTotalSize(), !response.isDone(), response.getNextRecordsUrl());
   }
 }

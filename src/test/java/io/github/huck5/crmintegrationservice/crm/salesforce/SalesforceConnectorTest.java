@@ -102,7 +102,7 @@ class SalesforceConnectorTest {
     when(httpClient.<String>send(any(HttpRequest.class), any())).thenReturn(response);
     when(response.statusCode()).thenReturn(200);
 
-    List<ContactDto> result = connector.getContacts();
+    List<ContactDto> result = connector.getContacts().contacts();
     // Verify response data, requested URI and cached token header.
     assertEquals(contacts, result);
 
@@ -148,7 +148,7 @@ class SalesforceConnectorTest {
       .thenReturn(expiredResponse)
       .thenReturn(successResponse);
 
-    List<ContactDto> result = connector.getContacts();
+    List<ContactDto> result = connector.getContacts().contacts();
     assertEquals(contacts, result);
     verify(provider).refreshToken();
     verify(httpClient, times(2)).send(any(HttpRequest.class), any());
@@ -246,7 +246,7 @@ class SalesforceConnectorTest {
     when(httpClient.<String>send(any(HttpRequest.class), any())).thenReturn(response);
     when(response.statusCode()).thenReturn(200);
 
-    List<ContactDto> result = connector.getContacts();
+    List<ContactDto> result = connector.getContacts().contacts();
 
     assertNull(result.getFirst().getEmail());
 
