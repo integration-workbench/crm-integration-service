@@ -8,11 +8,10 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.List;
 
-import io.github.huck5.crmintegrationservice.crm.ContactDto;
 import io.github.huck5.crmintegrationservice.crm.salesforce.mapper.SalesforceContactMapper;
 import io.github.huck5.crmintegrationservice.crm.salesforce.model.SalesforceContact;
+import io.github.huck5.crmintegrationservice.crm.response.ContactRetrievalResponse;
 import io.github.huck5.crmintegrationservice.crm.salesforce.response.SalesforceQueryResponse;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
@@ -31,13 +30,14 @@ public class SalesforceConnector extends AbstractOAuthConnector {
     this.httpClient = httpClient;
   }
 
-  public List<ContactDto> getContacts() throws URISyntaxException {
+  public ContactRetrievalResponse getContacts() throws URISyntaxException {
     SalesforceAccessToken token = (SalesforceAccessToken) tokenProvider.getToken();
     URI endpoint = new URI(token.getInstanceUrl() + CONTACTS_URI);
 
     HttpRequest request = HttpRequest.newBuilder()
                                      .uri(endpoint)
                                      .header("Authorization", "Bearer " + token.getAccessToken())
+                                     .header("Sforce-Query-Options", "batchSize=200")
                                      .GET()
                                      .build();
 
