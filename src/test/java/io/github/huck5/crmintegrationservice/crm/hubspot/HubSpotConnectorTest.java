@@ -93,7 +93,7 @@ class HubSpotConnectorTest {
     when(httpClient.<String>send(any(HttpRequest.class), any())).thenReturn(response);
     when(response.statusCode()).thenReturn(200);
 
-    List<ContactDto> result = connector.getContacts();
+    List<ContactDto> result = connector.getContacts().contacts();
     assertEquals(contacts, result);
 
     ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
@@ -138,12 +138,13 @@ class HubSpotConnectorTest {
           """);
 
     when(successResponse.body()).thenReturn(CONTACTS_JSON);
+    when(successResponse.statusCode()).thenReturn(200);
 
     when(httpClient.<String>send(any(HttpRequest.class), any()))
       .thenReturn(expiredResponse)
       .thenReturn(successResponse);
 
-    List<ContactDto> result = connector.getContacts();
+    List<ContactDto> result = connector.getContacts().contacts();
     assertEquals(contacts, result);
     verify(provider).refreshToken();
     verify(httpClient, times(2)).send(any(HttpRequest.class), any());
@@ -169,7 +170,7 @@ class HubSpotConnectorTest {
     when(httpClient.<String>send(any(HttpRequest.class), any()))
       .thenReturn(response);
 
-    List<ContactDto> result = connector.getContacts();
+    List<ContactDto> result = connector.getContacts().contacts();
 
     ContactDto expected = ContactDto.builder()
                                     .source(CrmSource.HUBSPOT)

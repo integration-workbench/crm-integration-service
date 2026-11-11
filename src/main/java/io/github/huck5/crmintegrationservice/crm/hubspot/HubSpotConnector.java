@@ -15,6 +15,7 @@ import io.github.huck5.crmintegrationservice.crm.hubspot.mapper.HubSpotContactMa
 import io.github.huck5.crmintegrationservice.crm.hubspot.model.HubSpotContact;
 import io.github.huck5.crmintegrationservice.crm.hubspot.response.HubSpotErrorResponse;
 import io.github.huck5.crmintegrationservice.crm.hubspot.response.HubSpotQueryResponse;
+import io.github.huck5.crmintegrationservice.crm.response.ContactRetrievalResponse;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -34,8 +35,9 @@ public class HubSpotConnector extends AbstractOAuthConnector {
     this.jsonMapper = jsonMapper;
   }
 
-  public List<ContactDto> getContacts() throws URISyntaxException {
-    URI endpoint = new URI(END_POINT + CONTACTS_URI);
+  public ContactRetrievalResponse getContacts() throws URISyntaxException {
+    URI endpoint = new URI(
+      END_POINT + CONTACTS_URI);
 
     HttpRequest request = buildGetRequest(endpoint);
 
@@ -57,6 +59,11 @@ public class HubSpotConnector extends AbstractOAuthConnector {
     }
     catch (IOException e) {
       throw new RuntimeException("HubSpot request failed", e);
+    }
+
+    if (response.statusCode() != 200) {
+      throw new IllegalStateException(
+        "HubSpot request failed: HTTP " + response.statusCode());
     }
 
     HubSpotQueryResponse<HubSpotContact> queryResponse = jsonMapper.readValue(response.body(),
