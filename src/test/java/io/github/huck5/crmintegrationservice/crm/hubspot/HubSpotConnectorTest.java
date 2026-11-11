@@ -138,6 +138,7 @@ class HubSpotConnectorTest {
           """);
 
     when(successResponse.body()).thenReturn(CONTACTS_JSON);
+    when(successResponse.statusCode()).thenReturn(200);
 
     when(httpClient.<String>send(any(HttpRequest.class), any()))
       .thenReturn(expiredResponse)

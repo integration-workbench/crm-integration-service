@@ -51,6 +51,7 @@ public class SalesforceConnector extends AbstractOAuthConnector {
           HttpRequest.newBuilder()
                      .uri(endpoint)
                      .header("Authorization", "Bearer " + tokenProvider.refreshToken().getAccessToken())
+                     .header("Sforce-Query-Options", "batchSize=200")
                      .GET()
                      .build();
 
