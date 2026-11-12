@@ -2,6 +2,7 @@ package io.github.huck5.crmintegrationservice.crm.salesforce;
 
 import io.github.huck5.crmintegrationservice.crm.ContactDto;
 import io.github.huck5.crmintegrationservice.crm.CrmSource;
+import io.github.huck5.crmintegrationservice.crm.response.ContactRetrievalResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,10 +20,13 @@ import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -257,5 +261,88 @@ class SalesforceConnectorTest {
     assertEquals(HttpMethod.GET.toString(), request.method());
     assertEquals(TEST_INSTANCE_URL + SalesforceConnector.CONTACTS_URI, request.uri().toString());
     assertEquals(List.of("Bearer " + TEST_ACCESS_TOKEN), request.headers().allValues("Authorization"));
+  }
+
+  @Test
+  void getContacts_whenMoreRecordsExist_preservesPagingMetadata()
+    throws Exception {
+
+    String nextUrl = "/services/data/v66.0/query/next-page";
+
+    when(response.statusCode()).thenReturn(200);
+    when(response.body()).thenReturn("""
+            {
+              "totalSize": 251,
+              "done": false,
+              "nextRecordsUrl": "%s",
+              "records": [
+                {
+                  "Id": "003000000000001",
+                  "FirstName": "Maria",
+                  "LastName": "Johnson",
+                  "Email": "maria@example.com"
+                }
+              ]
+            }
+            """.formatted(nextUrl));
+
+    when(httpClient.<String>send(any(HttpRequest.class), any()))
+      .thenReturn(response);
+
+    ContactRetrievalResponse result = connector.getContacts();
+
+    assertAll(
+      () -> assertEquals(contacts, result.contacts()),
+      () -> assertEquals(Long.valueOf(251), result.totalAvailable()),
+      () -> assertTrue(result.hasMore()),
+      () -> assertEquals(nextUrl, result.continuationToken())
+    );
+
+    verify(httpClient).send(any(HttpRequest.class), any());
+    verify(provider, times(0)).refreshToken();
+  }
+
+  @Test
+  void getContacts_whenPageIsComplete_returnsNoContinuation()
+    throws Exception {
+
+    when(response.statusCode()).thenReturn(200);
+    when(response.body()).thenReturn(CONTACTS_JSON);
+
+    when(httpClient.<String>send(any(HttpRequest.class), any()))
+      .thenReturn(response);
+
+    ContactRetrievalResponse result = connector.getContacts();
+
+    assertAll(
+      () -> assertEquals(contacts, result.contacts()),
+      () -> assertEquals(Long.valueOf(1), result.totalAvailable()),
+      () -> assertFalse(result.hasMore()),
+      () -> assertNull(result.continuationToken())
+    );
+  }
+
+  @Test
+  void getContacts_whenEmpty_returnsEmptyCompletedPage() throws Exception {
+    when(response.statusCode()).thenReturn(200);
+    when(response.body()).thenReturn("""
+            {
+              "totalSize": 0,
+              "done": true,
+              "records": []
+            }
+            """);
+
+    when(httpClient.<String>send(any(HttpRequest.class), any()))
+      .thenReturn(response);
+
+    ContactRetrievalResponse result = connector.getContacts();
+
+    assertAll(
+      () -> assertTrue(result.contacts().isEmpty()),
+      () -> assertEquals(Long.valueOf(0), result.totalAvailable()),
+      () -> assertFalse(result.hasMore()),
+      () -> assertNull(result.continuationToken())
+    );
   }
 }

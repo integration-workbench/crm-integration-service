@@ -1,185 +1,230 @@
 # CRM Integration Service
 
-A Java 21 / Spring Boot application that retrieves Contacts from Salesforce and HubSpot and exposes them through a shared JSON response format.
+A Java 21 / Spring Boot application that retrieves contacts from Salesforce and HubSpot and exposes them through a shared JSON response format.
 
-This repository currently contains the CRM retrieval application. Persistent local Contacts, frontend applications and Kafka synchronization are later project milestones.
+[Record Service](https://github.com/integration-workbench/record-service) consumes these responses to import contacts into its local database.
 
 ## Requirements
 
 - JDK 21.
-- Network access to download Maven dependencies and, for live requests, reach the configured CRM accounts.
-- Salesforce JWT bearer authentication configured for a dedicated development account.
-- A HubSpot OAuth app and an existing refresh token with permission to read Contacts.
+- Network access for Maven dependencies and live CRM requests.
+- Salesforce JWT bearer authentication configured for a development account.
+- A HubSpot OAuth application and refresh token with permission to read contacts.
 
-The Maven wrapper is included; a separate Maven installation is not required.
+The Maven Wrapper is included; a separate Maven installation is not required.
 
 ## Local configuration
 
-Supply these environment variables to the process running the application, for example through the IntelliJ run configuration or your shell:
+Supply these environment variables through your shell or IntelliJ run configuration:
 
 | Variable | Purpose |
 | --- | --- |
-| `SF_CONSUMER_KEY` | Salesforce OAuth application's consumer key/client ID. |
-| `SF_USER` | Salesforce username used as the JWT subject. |
-| `SF_LOGIN_URL` | Salesforce login base URL used for the token exchange and JWT audience, without a trailing slash. |
-| `HS_CLIENT_ID` | HubSpot OAuth application's client ID. |
-| `HS_CLIENT_SECRET` | HubSpot OAuth application's client secret. |
-| `HS_REFRESH_TOKEN` | Refresh token obtained during the initial HubSpot OAuth authorization. |
+| `SF_CONSUMER_KEY` | Salesforce OAuth application's consumer key/client ID |
+| `SF_USER` | Salesforce username used as the JWT subject |
+| `SF_LOGIN_URL` | Salesforce login base URL, without a trailing slash |
+| `HS_CLIENT_ID` | HubSpot OAuth application's client ID |
+| `HS_CLIENT_SECRET` | HubSpot OAuth application's client secret |
+| `HS_REFRESH_TOKEN` | Refresh token obtained during HubSpot authorization |
 
-The Salesforce provider also reads these files relative to the JVM's `user.home`:
+The Salesforce token provider also reads these files relative to the JVM's `user.home`:
 
-- `.secrets/crm-integration-service/server.key` — RSA signing private key.
-- `.secrets/crm-integration-service/server.crt` — matching public key/certificate material read by the provider.
+- `.secrets/crm-integration-service/server.key`
+- `.secrets/crm-integration-service/server.crt`
 
 Keep credentials and signing files outside the repository. The application does not automatically load a `.env` file.
 
 HubSpot configuration is required when the Spring application context starts. Salesforce signing files are read when a Salesforce token is requested.
 
-The Salesforce connector uses the `instance_url` returned by its OAuth token exchange to select the Contact API host.
+The Salesforce connector uses the `instance_url` returned by the token exchange to select the API host.
 
 ## Run locally
 
-From the repository root, after setting the required configuration:
+After setting the required configuration, run from the repository root.
+
+### Linux/macOS
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-On Windows PowerShell, use `.\mvnw.cmd spring-boot:run`.
+### Windows PowerShell
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
 
 The default local address is `http://localhost:8080`.
 
 ## Contact API
 
-| Method | Local endpoint | Source |
+| Method | Endpoint | Provider |
 | --- | --- | --- |
-| GET | `/salesforce/contacts` | Salesforce Contact SOQL query. |
-| GET | `/hubspot/contacts` | HubSpot Contacts API. |
+| GET | `/salesforce/contacts` | Salesforce |
+| GET | `/hubspot/contacts` | HubSpot |
 
 Example requests:
 
 ```bash
-curl -i -H 'Accept: application/json' http://localhost:8080/salesforce/contacts
-curl -i -H 'Accept: application/json' http://localhost:8080/hubspot/contacts
+curl -i http://localhost:8080/salesforce/contacts
+curl -i http://localhost:8080/hubspot/contacts
 ```
 
-A successful request returns HTTP `200` with a JSON array of normalized Contacts, not the original provider response wrapper:
+These endpoints are read-only. They retrieve contacts without importing them into Record Service or modifying either CRM.
+
+### Response format
+
+A successful request returns HTTP `200` with a `ContactRetrievalResponse` object:
 
 ```json
-[
-  {
-    "source": "HUBSPOT",
-    "externalId": "283634468816",
-    "firstName": "Maria",
-    "lastName": "Johnson",
-    "email": "maria@example.com"
-  }
-]
+{
+  "contacts": [
+    {
+      "source": "SALESFORCE",
+      "externalId": "003000000000001",
+      "firstName": "Maria",
+      "lastName": "Johnson",
+      "email": "maria@example.com"
+    }
+  ],
+  "totalAvailable": 251,
+  "hasMore": true,
+  "continuationToken": "/services/data/v66.0/query/example-200"
+}
 ```
 
-The Salesforce endpoint returns the same fields with `"source": "SALESFORCE"` and the Salesforce Contact ID, for example `"003000000000001"`.
+The continuation token above is illustrative. Callers must use the value supplied by the provider rather than constructing one.
 
-### Fields and missing values
+| Field | Meaning |
+| --- | --- |
+| `contacts` | Normalized contacts returned in this retrieval |
+| `totalAvailable` | Total matching contacts reported by the provider, or `null` when unavailable |
+| `hasMore` | Whether the provider response indicates another page |
+| `continuationToken` | Provider continuation value, or `null` when no further page is indicated |
+
+`totalAvailable` is independent of the number of contacts in the current page.
+
+For HubSpot, the response uses the same structure, but `totalAvailable` is `null`. When another page exists, `continuationToken` contains HubSpot's `paging.next.after` value.
+
+An empty completed Salesforce retrieval is represented as:
+
+```json
+{
+  "contacts": [],
+  "totalAvailable": 0,
+  "hasMore": false,
+  "continuationToken": null
+}
+```
+
+For an empty completed HubSpot retrieval, `totalAvailable` remains `null`.
+
+### Contact fields
 
 | Field | JSON type | Meaning |
 | --- | --- | --- |
-| `source` | string | `HUBSPOT` or `SALESFORCE`, assigned by the provider mapper. |
-| `externalId` | string | The Contact ID supplied by that CRM, preserved as text. |
-| `firstName` | string or null | First name supplied by the CRM. |
-| `lastName` | string or null | Last name supplied by the CRM. |
-| `email` | string or null | Email supplied by the CRM. |
+| `source` | string | `SALESFORCE` or `HUBSPOT` |
+| `externalId` | string | Contact ID supplied by the CRM |
+| `firstName` | string or null | First name supplied by the CRM |
+| `lastName` | string or null | Last name supplied by the CRM |
+| `email` | string or null | Email supplied by the CRM |
 
-Missing or explicitly null name/email values remain null in the DTO. Existing strings are copied without trimming, validation or case normalization. Missing names/email are not replaced with empty strings.
+Provider IDs are preserved as text. Missing or explicitly null names and email addresses remain null.
 
-For example, a Contact without an email is represented as:
+The mapper does not trim, validate, merge, or match contacts by name or email. It does not assign local contact IDs.
 
-```json
-[
-  {
-    "source": "SALESFORCE",
-    "externalId": "003000000000001",
-    "firstName": "Maria",
-    "lastName": "Johnson",
-    "email": null
-  }
-]
-```
+A missing/null provider results array or a missing HubSpot `properties` object is treated as malformed input rather than an empty successful result.
 
-A valid provider response containing an empty `records` or `results` array maps to:
+### Pagination and retrieval limits
 
-```json
-[]
-```
+Each request retrieves one provider page. A successful response does not imply that every matching CRM contact was returned.
 
-A missing/null results array or a missing HubSpot `properties` object is a malformed response for the current mapper; it is not treated as an empty result.
+| Provider | Retrieval behavior |
+| --- | --- |
+| Salesforce | Queries Contact fields through REST API `v66.0` and requests `batchSize=200` using `Sforce-Query-Options` |
+| HubSpot | Requests the Contacts API with `limit=10` |
 
-The API preserves source identity. It does not assign a local Contact ID, combine the two providers' results, or match people by name or email.
+Salesforce may return fewer records than the requested batch size. Use the returned metadata to determine whether another page exists.
 
-### Paging and retrieval limits
+Provider metadata is mapped as follows:
 
-**Each request returns only the first page supplied by the provider. A successful response does not imply that every Contact in the CRM was returned.**
+| Shared field | Salesforce | HubSpot |
+| --- | --- | --- |
+| `contacts` | Mapped `records` | Mapped `results` |
+| `totalAvailable` | `totalSize` | `null` |
+| `hasMore` | Inverse of `done` | Whether `paging.next` exists |
+| `continuationToken` | `nextRecordsUrl` | `paging.next.after` |
 
-- Salesforce queries `SELECT Id, FirstName, LastName, Email FROM Contact` using REST API `v66.0`. There is no explicit SOQL `LIMIT`, but the query can still be paged by Salesforce. The connector does not follow `nextRecordsUrl`.
-- HubSpot requests `/crm/objects/2026-09/contacts` without an explicit `limit` or `after` parameter, so the provider's default page size applies. The connector does not follow HubSpot paging information.
-- The local endpoints accept no pagination parameters and return a bare array. They do not expose continuation tokens, a total count or a completeness flag.
-- Record ordering is not guaranteed by the local API.
+The connectors do not follow continuation values automatically. The local endpoints do not yet accept a continuation token.
 
-Full import pagination and recovery are later work, tracked separately in KAN-39.
+Record ordering is not guaranteed by the local API. Full traversal and recovery are separate work tracked under KAN-51.
 
 ### Authentication recovery and errors
 
-The application obtains and caches CRM access tokens on the server.
+Access tokens are obtained and cached on the server.
 
-| Provider | Recovery behavior |
+| Provider | Authentication recovery |
 | --- | --- |
-| Salesforce | HTTP `401` with the first error's `errorCode` equal to `INVALID_SESSION_ID` triggers a new JWT token exchange and one retry of the Contact GET. A final non-`200` status raises an `IllegalStateException`. |
-| HubSpot | HTTP `401` with `category` equal to `EXPIRED_AUTHENTICATION` triggers a refresh-token exchange and one retry of the Contact GET. Other categories do not trigger that retry. |
+| Salesforce | HTTP `401` with the first error's `errorCode` equal to `INVALID_SESSION_ID` triggers a new JWT token exchange and one retry |
+| HubSpot | HTTP `401` with `category` equal to `EXPIRED_AUTHENTICATION` triggers a refresh-token exchange and one retry |
 
-A token replacement failure stops the operation before another Contact GET. There is no retry loop for repeated authentication failures, network errors, rate limits or general provider failures. Interrupted HTTP operations restore the thread's interrupted flag and raise an exception.
+The retry retains the retrieval endpoint and its configured limits. Salesforce also retains its batch-size header.
 
-**Current HubSpot limitation:** after the optional retry, the connector does not yet reject all non-`200` statuses before deserializing the body as a query response. A provider error can therefore surface as a JSON parsing or mapping exception instead of an explicit HTTP-status exception. The final status guard remains follow-up work for KAN-48.
+If token replacement fails, the operation stops before another contact request. A failed retry is not retried again.
 
-The controllers currently let failures propagate to Spring Boot's default error handling. An upstream CRM `401`, `403` or `500` is not forwarded as that same HTTP status; unhandled application failures normally produce HTTP `500`. There is no application-defined error DTO or stable error-body schema yet. Spring Boot's error response can include fields such as `timestamp`, `status`, `error` and `path`; callers should not depend on an exception message being included.
+Both connectors check the final response status before mapping contacts. A final non-`200` response raises an exception rather than being treated as a successful retrieval.
+
+There is no general retry loop for rate limits, network failures, or other provider errors. Interrupted HTTP operations restore the thread's interrupted flag and raise an exception.
+
+Unhandled failures use Spring Boot's default error handling and normally produce HTTP `500`. Provider status codes are not forwarded directly, and the application does not yet define a stable error-response DTO.
 
 ## Tests
 
-Run the existing isolated CRM tests without live credentials:
+Run the full suite:
 
-```bash
-./mvnw -Dtest=HubSpotConnectorTest,HubSpotTokenProviderTest,SalesforceConnectorTest test
-```
-
-These tests use mocked HTTP responses and real Jackson mapping. Current coverage includes successful Contact mapping, basic authentication recovery, HubSpot token caching/expiry and Salesforce failure/retry bounds.
-
-To run the whole suite, including the Spring context startup test:
+### Linux/macOS
 
 ```bash
 ./mvnw test
 ```
 
-The context test supplies dummy HubSpot values and does not make live CRM calls. On Windows, use `.\mvnw.cmd test`.
+### Windows PowerShell
 
-Missing optional fields, empty results and the HTTP serialization/error boundary still need dedicated verification; the existing test fixtures do not yet cover all of those cases. GitHub Actions runs the Maven test suite on pushes.
+```powershell
+.\mvnw.cmd test
+```
+
+Connector tests use mocked HTTP responses and real JSON mapping, without live CRM requests. The Spring context test supplies dummy HubSpot configuration.
+
+Relevant test areas include:
+
+- Contact mapping and response serialization.
+- Empty successful retrievals.
+- Responses with and without another page.
+- Nullable provider totals and continuation tokens.
+- Retrieval limits retained during authentication retries.
+- Provider errors and unsuccessful authentication retries.
 
 ## Docker
 
-A two-stage Dockerfile builds and packages the application:
+Build the application image:
 
 ```bash
 docker build -t crm-integration-service .
 ```
 
-The image exposes port `8080`. Runtime execution still needs the environment variables above and the Salesforce signing files at the paths expected by the JVM inside the container.
+The image exposes port `8080`. Running it requires the environment variables and Salesforce signing files described above, at the paths expected inside the container.
 
-The Docker build currently uses `-DskipTests`; building an image is not a substitute for running the test suite.
+The Docker build uses `-DskipTests`; run the test suite separately.
 
 ## Code organization
 
-- `crm.salesforce` and `crm.hubspot` controller classes — local HTTP endpoints.
-- `crm` — shared Contact DTO, source enum and authentication contracts.
-- `crm.salesforce` and `crm.hubspot` — provider connectors and token providers.
-- Provider `model` and `response` packages — external JSON shapes.
-- Provider `mapper` packages — conversion into `ContactDto`.
-- `config` — shared HTTP client and clock configuration.
+- Provider controllers expose the local retrieval endpoints.
+- `crm` contains shared contact and authentication contracts.
+- `crm.response` contains the shared retrieval response.
+- Provider connectors perform CRM HTTP requests.
+- Token providers obtain and cache access tokens.
+- Provider model and response packages represent external JSON structures.
+- Provider mappers normalize contacts and retrieval metadata.
+- `config` provides shared HTTP client and clock configuration.
 
-The application is currently a local, read-only proof of concept. Concurrent token coordination, durable Contact storage, CRM writes, Kafka messaging, frontend applications and deployment orchestration remain separate milestones.
+CRM writes, automatic synchronization, full pagination, Kafka messaging, and frontend applications remain separate capabilities.
