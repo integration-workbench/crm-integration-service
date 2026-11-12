@@ -2,6 +2,7 @@ package io.github.huck5.crmintegrationservice.crm.hubspot;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,9 +17,12 @@ import java.util.List;
 
 import io.github.huck5.crmintegrationservice.crm.ContactDto;
 import io.github.huck5.crmintegrationservice.crm.CrmSource;
+import io.github.huck5.crmintegrationservice.crm.response.ContactRetrievalResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -180,5 +184,107 @@ class HubSpotConnectorTest {
                                     .build();
 
     assertEquals(List.of(expected), result);
+  }
+
+  @Test
+  void getContacts_whenMoreRecordsExist_preservesPagingMetadata()
+    throws Exception {
+
+    when(response.statusCode()).thenReturn(200);
+    when(response.body()).thenReturn("""
+            {
+              "results": [
+                {
+                  "id": "283634468816",
+                  "properties": {
+                    "firstname": "Maria",
+                    "lastname": "Johnson",
+                    "email": "maria@example.com"
+                  }
+                }
+              ],
+              "paging": {
+                "next": {
+                  "after": "288431635415",
+                  "link": "https://api.hubapi.com/crm/objects/2026-09/contacts?after=288431635415"
+                }
+              }
+            }
+            """);
+
+    when(httpClient.<String>send(any(HttpRequest.class), any()))
+      .thenReturn(response);
+
+    ContactRetrievalResponse result = connector.getContacts();
+
+    assertAll(
+      () -> assertEquals(contacts, result.contacts()),
+      () -> assertNull(result.totalAvailable()),
+      () -> assertTrue(result.hasMore()),
+      () -> assertEquals(
+        "288431635415", result.continuationToken())
+    );
+
+    verify(httpClient).send(any(HttpRequest.class), any());
+    verify(provider, never()).refreshToken();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {
+    "",
+    ", \"paging\": {}",
+    ", \"paging\": {\"next\": null}"
+  })
+  void getContacts_whenNextPageAbsent_returnsCompletedPage(
+    String pagingFragment) throws Exception {
+
+    when(response.statusCode()).thenReturn(200);
+    when(response.body()).thenReturn("""
+            {
+              "results": [
+                {
+                  "id": "283634468816",
+                  "properties": {
+                    "firstname": "Maria",
+                    "lastname": "Johnson",
+                    "email": "maria@example.com"
+                  }
+                }
+              ]
+              %s
+            }
+            """.formatted(pagingFragment));
+
+    when(httpClient.<String>send(any(HttpRequest.class), any()))
+      .thenReturn(response);
+
+    ContactRetrievalResponse result = connector.getContacts();
+
+    assertAll(
+      () -> assertEquals(contacts, result.contacts()),
+      () -> assertNull(result.totalAvailable()),
+      () -> assertFalse(result.hasMore()),
+      () -> assertNull(result.continuationToken())
+    );
+  }
+
+  @Test
+  void getContacts_whenEmpty_returnsEmptyCompletedPage() throws Exception {
+    when(response.statusCode()).thenReturn(200);
+    when(response.body()).thenReturn("""
+            {"results": []}
+            """);
+
+    when(httpClient.<String>send(any(HttpRequest.class), any()))
+      .thenReturn(response);
+
+    ContactRetrievalResponse result = connector.getContacts();
+
+    assertAll(
+      () -> assertTrue(result.contacts().isEmpty()),
+      () -> assertNull(result.totalAvailable()),
+      () -> assertFalse(result.hasMore()),
+      () -> assertNull(result.continuationToken())
+    );
   }
 }
