@@ -1,6 +1,13 @@
 package io.github.huck5.crmintegrationservice.crm.salesforce;
 
 import io.github.huck5.crmintegrationservice.crm.AbstractOAuthConnector;
+import io.github.huck5.crmintegrationservice.crm.response.ContactRetrievalResponse;
+import io.github.huck5.crmintegrationservice.crm.salesforce.mapper.SalesforceContactMapper;
+import io.github.huck5.crmintegrationservice.crm.salesforce.model.SalesforceContact;
+import io.github.huck5.crmintegrationservice.crm.salesforce.response.SalesforceQueryResponse;
+import org.springframework.stereotype.Component;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.net.URI;
@@ -8,14 +15,6 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-
-import io.github.huck5.crmintegrationservice.crm.salesforce.mapper.SalesforceContactMapper;
-import io.github.huck5.crmintegrationservice.crm.salesforce.model.SalesforceContact;
-import io.github.huck5.crmintegrationservice.crm.response.ContactRetrievalResponse;
-import io.github.huck5.crmintegrationservice.crm.salesforce.response.SalesforceQueryResponse;
-import org.springframework.stereotype.Component;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.json.JsonMapper;
 
 @Component
 public class SalesforceConnector extends AbstractOAuthConnector {
@@ -30,9 +29,10 @@ public class SalesforceConnector extends AbstractOAuthConnector {
     this.httpClient = httpClient;
   }
 
-  public ContactRetrievalResponse getContacts() throws URISyntaxException {
+  public ContactRetrievalResponse getContacts(String continuationToken) throws URISyntaxException {
     SalesforceAccessToken token = (SalesforceAccessToken) tokenProvider.getToken();
-    URI endpoint = new URI(token.getInstanceUrl() + CONTACTS_URI);
+    String path = continuationToken == null ? CONTACTS_URI : continuationToken;
+    URI endpoint = new URI(token.getInstanceUrl() + path);
 
     HttpRequest request = HttpRequest.newBuilder()
                                      .uri(endpoint)
