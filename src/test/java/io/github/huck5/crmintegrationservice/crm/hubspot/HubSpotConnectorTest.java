@@ -92,7 +92,7 @@ class HubSpotConnectorTest {
   }
 
   @Test
-  void getContacts_whenSuccessful_returnsContacts() throws IOException, InterruptedException, URISyntaxException {
+  void getContactsWhenSuccessfulReturnsContacts() throws IOException, InterruptedException, URISyntaxException {
     when(response.body()).thenReturn(CONTACTS_JSON);
     when(httpClient.<String>send(any(HttpRequest.class), any())).thenReturn(response);
     when(response.statusCode()).thenReturn(200);
@@ -111,7 +111,7 @@ class HubSpotConnectorTest {
   }
 
   @Test
-  void getContacts_whenTokenExpired_refreshesAndReturnsContacts() throws IOException, InterruptedException, URISyntaxException {
+  void getContactsWhenTokenExpiredRefreshesAndReturnsContacts() throws IOException, InterruptedException, URISyntaxException {
     String replacementTokenJson =
       """
         {
@@ -155,7 +155,7 @@ class HubSpotConnectorTest {
   }
 
   @Test
-  void getContacts_whenMissingEmail_producesNullEmail()
+  void getContactsWhenMissingEmailProducesNullEmail()
     throws IOException, InterruptedException, URISyntaxException {
     when(response.body()).thenReturn("""
       {
@@ -187,7 +187,7 @@ class HubSpotConnectorTest {
   }
 
   @Test
-  void getContacts_whenMoreRecordsExist_preservesPagingMetadata()
+  void getContactsWhenMoreRecordsExistPreservesPagingMetadata()
     throws Exception {
 
     when(response.statusCode()).thenReturn(200);
@@ -235,7 +235,7 @@ class HubSpotConnectorTest {
     ", \"paging\": {}",
     ", \"paging\": {\"next\": null}"
   })
-  void getContacts_whenNextPageAbsent_returnsCompletedPage(
+  void getContactsWhenNextPageAbsentReturnsCompletedPage(
     String pagingFragment) throws Exception {
 
     when(response.statusCode()).thenReturn(200);
@@ -269,7 +269,7 @@ class HubSpotConnectorTest {
   }
 
   @Test
-  void getContacts_whenEmpty_returnsEmptyCompletedPage() throws Exception {
+  void getContactsWhenEmptyReturnsEmptyCompletedPage() throws Exception {
     when(response.statusCode()).thenReturn(200);
     when(response.body()).thenReturn("""
             {"results": []}

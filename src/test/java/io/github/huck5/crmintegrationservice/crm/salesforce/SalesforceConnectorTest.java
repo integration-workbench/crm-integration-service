@@ -101,7 +101,7 @@ class SalesforceConnectorTest {
   }
 
   @Test
-  void getContacts_whenSuccessful_returnsContacts() throws IOException, InterruptedException, URISyntaxException {
+  void getContactsWhenSuccessfulReturnsContacts() throws IOException, InterruptedException, URISyntaxException {
     when(response.body()).thenReturn(CONTACTS_JSON);
     when(httpClient.<String>send(any(HttpRequest.class), any())).thenReturn(response);
     when(response.statusCode()).thenReturn(200);
@@ -120,7 +120,7 @@ class SalesforceConnectorTest {
   }
 
   @Test
-  void getContacts_withUnauthorizedResponse_retriesWithReplacementToken()
+  void getContactsWithUnauthorizedResponseRetriesWithReplacementToken()
     throws IOException, InterruptedException, URISyntaxException {
     String replacementTokenJson =
       """
@@ -159,7 +159,7 @@ class SalesforceConnectorTest {
   }
 
   @Test
-  void getContacts_whenRetryAlsoUnauthorized_surfacesFailureWithoutFurtherRetry() throws IOException, InterruptedException {
+  void getContactsWhenRetryAlsoUnauthorizedSurfacesFailureWithoutFurtherRetry() throws IOException, InterruptedException {
     // Both GETs return 401.
     // Verify one token replacement, exactly two GETs
     // and the failure exposed to the caller.
@@ -196,7 +196,7 @@ class SalesforceConnectorTest {
   }
 
   @Test
-  void getContacts_withNon401Error_doesNotReplaceTokenOrRetry() throws IOException, InterruptedException {
+  void getContactsWithNon401ErrorDoesNotReplaceTokenOrRetry() throws IOException, InterruptedException {
     // For example, a 403 permission failure.
     // Verify one GET, no replacement and the surfaced failure.
     when(expiredResponse.statusCode()).thenReturn(403);
@@ -211,7 +211,7 @@ class SalesforceConnectorTest {
   }
 
   @Test
-  void getContacts_whenTokenReplacementFails_surfacesFailureWithoutRetry()
+  void getContactsWhenTokenReplacementFailsSurfacesFailureWithoutRetry()
     throws IOException, InterruptedException {
     IllegalStateException failure =
       new IllegalStateException("Token replacement failed");
@@ -233,7 +233,7 @@ class SalesforceConnectorTest {
   }
 
   @Test
-  void getContacts_whenMissingEmail_producesNullEmail() throws IOException, InterruptedException, URISyntaxException {
+  void getContactsWhenMissingEmailProducesNullEmail() throws IOException, InterruptedException, URISyntaxException {
     when(response.body()).thenReturn("""
       {
         "totalSize": 1,
@@ -264,7 +264,7 @@ class SalesforceConnectorTest {
   }
 
   @Test
-  void getContacts_whenMoreRecordsExist_preservesPagingMetadata()
+  void getContactsWhenMoreRecordsExistPreservesPagingMetadata()
     throws Exception {
 
     String nextUrl = "/services/data/v66.0/query/next-page";
@@ -303,7 +303,7 @@ class SalesforceConnectorTest {
   }
 
   @Test
-  void getContacts_whenPageIsComplete_returnsNoContinuation()
+  void getContactsWhenPageIsCompleteReturnsNoContinuation()
     throws Exception {
 
     when(response.statusCode()).thenReturn(200);
@@ -323,7 +323,7 @@ class SalesforceConnectorTest {
   }
 
   @Test
-  void getContacts_whenEmpty_returnsEmptyCompletedPage() throws Exception {
+  void getContactsWhenEmptyReturnsEmptyCompletedPage() throws Exception {
     when(response.statusCode()).thenReturn(200);
     when(response.body()).thenReturn("""
             {
