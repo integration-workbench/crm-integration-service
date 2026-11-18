@@ -59,7 +59,7 @@ class HubSpotTokenProviderTest {
   }
 
   @Test
-  void getToken_whenNoTokenCached_requestsToken() throws IOException, InterruptedException {
+  void getTokenWhenNoTokenCachedRequestsToken() throws IOException, InterruptedException {
     HubSpotAccessToken token = provider.getToken();
 
     assertNotNull(token);
@@ -69,7 +69,7 @@ class HubSpotTokenProviderTest {
   }
 
   @Test
-  void getToken_whenCachedTokenValid_returnsCachedToken() throws IOException, InterruptedException {
+  void getTokenWhenCachedTokenValidReturnsCachedToken() throws IOException, InterruptedException {
     HubSpotAccessToken first = provider.getToken();
     HubSpotAccessToken second = provider.getToken();
 
@@ -79,7 +79,7 @@ class HubSpotTokenProviderTest {
   }
 
   @Test
-  void getToken_whenTokenExpired_refreshesToken() throws IOException, InterruptedException {
+  void getTokenWhenTokenExpiredRefreshesToken() throws IOException, InterruptedException {
     HubSpotAccessToken first = provider.getToken();
 
     assertEquals(TEST_ACCESS_TOKEN, first.getAccessToken());
@@ -110,7 +110,7 @@ class HubSpotTokenProviderTest {
   }
 
   @Test
-  void getToken_whenWithinExpiryBuffer_refreshesToken() throws IOException, InterruptedException {
+  void getTokenWhenWithinExpiryBufferRefreshesToken() throws IOException, InterruptedException {
     HubSpotAccessToken first = provider.getToken();
 
     assertEquals(TEST_ACCESS_TOKEN, first.getAccessToken());
@@ -141,7 +141,7 @@ class HubSpotTokenProviderTest {
   }
 
   @Test
-  void getToken_whenRefreshFails_throwsException() throws IOException, InterruptedException {
+  void getTokenWhenRefreshFailsThrowsException() throws IOException, InterruptedException {
     // Acquire the initial token successfully.
     provider.getToken();
 
@@ -157,7 +157,7 @@ class HubSpotTokenProviderTest {
   }
 
   @Test
-  void refreshToken_whenTokenCached_replacesCachedToken() throws IOException, InterruptedException {
+  void refreshTokenWhenTokenCachedReplacesCachedToken() throws IOException, InterruptedException {
     HubSpotAccessToken original = provider.getToken();
 
     when(response.body())
