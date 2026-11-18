@@ -29,6 +29,10 @@ public class SalesforceConnector extends AbstractOAuthConnector {
     this.httpClient = httpClient;
   }
 
+  public ContactRetrievalResponse getContacts() throws URISyntaxException {
+    return getContacts(null);
+  }
+
   public ContactRetrievalResponse getContacts(String continuationToken) throws URISyntaxException {
     SalesforceAccessToken token = (SalesforceAccessToken) tokenProvider.getToken();
     String path = continuationToken == null ? CONTACTS_URI : continuationToken;

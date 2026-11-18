@@ -35,6 +35,10 @@ public class HubSpotConnector extends AbstractOAuthConnector {
     this.jsonMapper = jsonMapper;
   }
 
+  public ContactRetrievalResponse getContacts() throws URISyntaxException {
+    return getContacts(null);
+  }
+
   public ContactRetrievalResponse getContacts(String continuationToken) throws URISyntaxException {
     String url = END_POINT + CONTACTS_URI + (continuationToken == null ? "" : "?after=" + continuationToken);
 
